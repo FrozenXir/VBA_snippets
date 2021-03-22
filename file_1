@@ -1,0 +1,313 @@
+Option Explicit
+
+Public Const CHUNK_SIZE             As Integer = 170
+Public Const BIG_WB_SHEET_NAME      As String = "Ready for prod"
+Public Const FOLDER_TO_SAVE         As String = "C:\Users\aapostu\Desktop\Contracts Ready for prod\docs\Output"
+
+' Source paths.
+Public Const BIG_WB_PATH            As String = "C:\Users\aapostu\Desktop\Contracts Ready for prod\docs\PDO_EP4_100_20210215_141300_final von HR. GEnsler.xlsx"
+Public Const PDF_SOURCE_FOLDER      As String = "C:\Users\aapostu\Desktop\Contracts"
+Public Const JPG_SOURCE_FOLDER      As String = "C:\Users\aapostu\Desktop\Contracts\jpg"
+
+Public Const ATTACH_START_COL       As Integer = 40
+Public Const ATTACH_END_COL         As Integer = 49
+
+Public BigTable()   As Variant
+Public FSO          As Scripting.FileSystemObject
+
+Public Sub SplitRows()
+
+    ' Read data from the big file.
+    Call TurnOffEvents
+    BigTable = ReadBigFile
+    
+    ' Iterate over table and get chunks of data in a new table.
+    Dim PDFValues       As Scripting.Dictionary
+    Dim PDFName         As String
+    Dim FileFolder      As String
+    Dim ChunkTable()    As Variant
+    Dim ChunkCount      As Long
+    Dim ChunkProcessed  As Long
+    Dim LeftOverChecked As Boolean
+    Dim LeftOverSize    As Long
+    Dim TableLimit      As Long
+    Dim i               As Long
+    Dim j               As Long
+    
+    Set PDFValues = New Scripting.Dictionary
+    Set FSO = New Scripting.FileSystemObject
+    TableLimit = UBound(BigTable, 1)
+    
+    ' Ensure the input file and output folder exists.
+    With FSO
+        If Not .FolderExists(FOLDER_TO_SAVE) Then _
+            .CreateFolder Path:=FOLDER_TO_SAVE
+            
+        If Not .FileExists(BIG_WB_PATH) Or Not .FolderExists(PDF_SOURCE_FOLDER) Or Not .FolderExists(JPG_SOURCE_FOLDER) Then
+            Call TurnOnEvents
+            MsgBox "Your input file(s) are nowhere to be found.", vbCritical + vbOKOnly, "Error: File Not Found"
+            End
+        End If
+    End With
+
+    For i = 2 To TableLimit
+        LeftOverSize = TableLimit - (ChunkProcessed * CHUNK_SIZE)
+        FileFolder = vbNullString
+        ChunkCount = ChunkCount + 1
+        
+        ' Redimension table if it's not allocated.
+        ' Note: Means we've written a chunk already and it's time to create a new one.
+        If (Not Not ChunkTable) = 0 Then _
+            ReDim ChunkTable(1 To CHUNK_SIZE, LBound(BigTable, 2) To UBound(BigTable, 2))
+            
+        ' Write data to the chunk table.
+        For j = LBound(BigTable, 2) To UBound(BigTable, 2)
+            ChunkTable(ChunkCount, j) = BigTable(i, j)
+            
+            ' Gather unique values from the attachment columns.
+            If j >= ATTACH_START_COL And j <= ATTACH_END_COL Then
+                If Trim(BigTable(i, j)) <> vbNullString Then
+                    PDFName = Trim(Split(BigTable(i, j), "files/")(1))
+                        
+                    If Not PDFValues.Exists(PDFName) Then _
+                        PDFValues.Add PDFName, Empty
+                End If
+            End If
+        Next j
+
+        ' Write data to the output file once we're at the limit (of chunk).
+        If ChunkCount = CHUNK_SIZE Then
+            ChunkProcessed = ChunkProcessed + 1
+            ChunkCount = 0
+            
+            FileFolder = WriteData(ChunkTable, PDFValues, i)
+            Call MoveFiles(PDFValues, FileFolder)
+            PDFValues.RemoveAll
+            
+        ' Write data to the output file once we're at the end (the leftovers).
+        ElseIf LeftOverSize < CHUNK_SIZE And i = TableLimit Then
+            ChunkProcessed = ChunkProcessed + 1
+            
+            FileFolder = WriteData(ChunkTable, PDFValues, i, IsLeftOver:=True, LeftOverSize:=LeftOverSize)
+            Call MoveFiles(PDFValues, FileFolder)
+        End If
+    Next i
+    
+    Call TurnOnEvents
+    MsgBox "Done!" & vbCrLf & vbCrLf & "Created " & ChunkProcessed & " files.", vbInformation + vbOKOnly, "Operation successful"
+    
+End Sub
+
+_________________________________________________________________________________________________________________________________________
+
+Option Explicit
+
+Public Wb       As Workbook
+Public DataWs   As Worksheet
+Public FileWs   As Worksheet
+
+Public Sub TurnOffEvents()
+
+    With Application
+        .ScreenUpdating = False
+        .EnableAnimations = False
+        .EnableEvents = False
+        .DisplayAlerts = False
+        .DisplayStatusBar = False
+    End With
+    
+End Sub
+
+Public Sub TurnOnEvents()
+
+    With Application
+        .ScreenUpdating = True
+        .EnableAnimations = True
+        .EnableEvents = True
+        .DisplayAlerts = True
+        .DisplayStatusBar = True
+    End With
+    
+End Sub
+
+Public Function ReadBigFile() As Variant()
+
+    Dim Table() As Variant
+    
+    ' Open workbook normally.
+    On Error Resume Next
+    Set Wb = Workbooks.Open(FileName:=BIG_WB_PATH, UpdateLinks:=False, ReadOnly:=False, IgnoreReadOnlyRecommended:=False)
+    
+    ' If error then try to open it in repair mode.
+    If Wb Is Nothing Or Err.Number <> 0 Then
+        Err.Clear
+        Set Wb = Workbooks.Open(FileName:=BIG_WB_PATH, UpdateLinks:=False, ReadOnly:=False, IgnoreReadOnlyRecommended:=False, CorruptLoad:=xlRepairFile)
+    End If
+    
+    ' If error again then file is missing or path is invalid.
+    If Err.Number <> 0 Then
+        MsgBox "File is missing or path is invalid, please check!", vbCritical + vbOKOnly, "Error Encountered"
+        End
+    End If
+    On Error GoTo 0
+    
+    With Wb
+        Table = .Worksheets(BIG_WB_SHEET_NAME).Range("A1").CurrentRegion.Value2
+        .Close SaveChanges:=False
+    End With
+    Set Wb = Nothing
+    
+    ReadBigFile = Table
+    Erase Table
+
+End Function
+
+Public Function CreateOutputFile(ByVal ChunkRange As String) As Workbook
+
+    ' Create a new workbook.
+    Dim i As Long
+    Set Wb = Workbooks.Add
+    
+    ' Create "Range" sheet and add the header.
+    Set DataWs = Wb.Worksheets(1)
+    
+    With DataWs
+        .Name = "Range" & ChunkRange
+    
+        For i = LBound(BigTable, 2) To UBound(BigTable, 2)
+            .Cells(1, i).Value2 = BigTable(1, i)
+        Next i
+    End With
+    
+    ' Create "PDF Names" sheet.
+    Set FileWs = Wb.Worksheets.Add(After:=DataWs)
+    FileWs.Name = "PDF Names"
+    
+    ' Return workbook object.
+    Set CreateOutputFile = Wb
+    
+    ' Garbage collector.
+    Set DataWs = Nothing
+    Set FileWs = Nothing
+    Set Wb = Nothing
+
+End Function
+
+Public Function WriteData(ByRef ChunkTable() As Variant, _
+                     ByRef DictValues As Scripting.Dictionary, _
+                     ByVal EndRng As Long, _
+            Optional ByVal IsLeftOver As Boolean = False, _
+            Optional ByVal LeftOverSize As Long) As String
+
+    Dim Key As Variant, RowNum As Long, ChunkRng As String, FolderName As String, FileName As String
+    
+    ' Determine the chunk range.
+    If IsLeftOver Then
+        ChunkRng = " " & EndRng - LeftOverSize & "-" & EndRng
+    Else
+        ChunkRng = " " & EndRng - CHUNK_SIZE & "-" & EndRng
+    End If
+
+    ' Create the output file and capture sheet objects.
+    Set Wb = CreateOutputFile(ChunkRng)
+    Set DataWs = Wb.Worksheets(1)
+    Set FileWs = Wb.Worksheets(2)
+    
+    ' Write data to first sheet (table).
+    With DataWs
+        .Range("A2").Resize(UBound(ChunkTable, 1), UBound(ChunkTable, 2)).Value2 = ChunkTable()
+        .Columns("J:K").NumberFormat = "mm/dd/yyyy"
+        Erase ChunkTable
+    End With
+    
+    ' Write data to second sheet (PDF names).
+    With FileWs
+        RowNum = 2
+        .Range("A1").Value2 = "PDF String Names"
+        
+        If DictValues.Count > 0 Then
+            For Each Key In DictValues.Keys
+                .Range("A" & RowNum).Value2 = Key
+                RowNum = RowNum + 1
+            Next Key
+        Else
+            .Range("A2").Value2 = "No values were found."
+        End If
+    End With
+    
+    ' Save the workbook file.
+    FileName = "Split" & ChunkRng
+    FolderName = FOLDER_TO_SAVE & Application.PathSeparator & FileName
+    
+    With FSO
+        If .FolderExists(FolderName) Then _
+            .DeleteFolder FolderName
+
+        .CreateFolder FolderName
+    End With
+    
+    With Wb
+        .SaveAs FileName:=FolderName & Application.PathSeparator & FileName & ".xlsx", FileFormat:=xlOpenXMLWorkbook
+
+        Do
+        Loop Until .Saved
+        
+        .Close
+    End With
+    
+    ' Garbage collector.
+    Set DataWs = Nothing
+    Set FileWs = Nothing
+    Set Wb = Nothing
+    
+    ' Return
+    WriteData = FolderName
+
+End Function
+
+Public Sub MoveFiles(ByRef FileNames As Scripting.Dictionary, ByVal FolderPath As String)
+
+    Dim PDFFolder As Scripting.Folder, JPGFolder As Scripting.Folder
+    Dim PDFFile As Scripting.File, JPGFile As Scripting.File
+    Dim Key As Variant, FilesDestination As String
+    
+    FilesDestination = FolderPath & Application.PathSeparator & "files" & Application.PathSeparator
+
+    With FSO
+        
+        ' Create the destination files folder.
+        .CreateFolder FilesDestination
+
+        ' Set folders as objects.
+        Set PDFFolder = .GetFolder(PDF_SOURCE_FOLDER)
+        Set JPGFolder = .GetFolder(JPG_SOURCE_FOLDER)
+    
+        ' Go through each file name in the list.
+        For Each Key In FileNames.Keys
+            Select Case LCase(Right(Key, 3))
+                Case "pdf"
+                    
+                    ' Scan for PDFs and move them.
+                    For Each PDFFile In PDFFolder.Files
+                        If Key = PDFFile.Name Then
+                            .CopyFile Source:=PDFFile, Destination:=FilesDestination
+                            Exit For
+                        End If
+                    Next PDFFile
+                    
+                Case "jpg"
+                
+                    ' Scan for JPGs and move them.
+                    For Each JPGFile In JPGFolder.Files
+                        If Key = JPGFile.Name Then
+                            .CopyFile Source:=JPGFile, Destination:=FilesDestination
+                            Exit For
+                        End If
+                      Next JPGFile
+            End Select
+        Next Key
+    End With
+
+End Sub
+
+
