@@ -8,5 +8,12 @@ Sub SimpleDoLoop()
     Do Until ActiveCell.Value = ""
         ActiveCell.Offset(1, 0).Select
     Loop
+' also you can user While to check if the condition is true.
+
+    Do While ActiveCell.Value = ""
+        ActiveCell.Offset(1, 0).Select
+    Loop
+' also you can exist using Exit function 
+
    
 End Sub
