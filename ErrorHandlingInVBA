@@ -1,0 +1,22 @@
+Option Explicit
+
+Sub ErrorsInVBA()
+
+    On Error GoTo CreateSheet100
+    Worksheets("Sheet42").Select
+    On Error GoTo 0
+' Here the error hanling will be set to 0
+    
+    Range("A1").Value = Now
+    Range("A").Value = 1 / 0
+    
+    Exit Sub
+'***********************
+' ERROR HANDLING SECTION
+'***********************
+    
+CreateSheet100:
+    Worksheets.Add.Name = "Sheet42"
+    Resume Next
+        
+End Sub
