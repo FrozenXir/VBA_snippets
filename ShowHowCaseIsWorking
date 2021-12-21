@@ -1,0 +1,17 @@
+Option Explicit
+
+Sub ShowHowCaseIsWorking()
+    Dim ValueFromCell As Integer
+    ValueFromCell = 100
+
+    Select Case ValueFromCell
+        Case Is < 100
+            MsgBox ("The value is less then 100")
+        Case Is < 120
+            MsgBox ("The value is less then 120")
+        Case Else
+            MsgBox ("The value is more then 120")
+    End Select
+        
+    
+End Sub
