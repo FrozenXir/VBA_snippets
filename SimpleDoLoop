@@ -1,0 +1,12 @@
+Option Explicit
+
+Sub SimpleDoLoop()
+    
+    Range("A1").Select
+' if you add the true statement in loop the value will be alloways checked at the end and sometimes is not what you need
+
+    Do Until ActiveCell.Value = ""
+        ActiveCell.Offset(1, 0).Select
+    Loop
+   
+End Sub
