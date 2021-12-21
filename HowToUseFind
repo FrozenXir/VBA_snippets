@@ -1,0 +1,14 @@
+Option Explicit
+
+Sub HowToUseFind()
+    Dim FindCell As Range
+    
+    Set FindCell = Range("B2:B19").Find(What:="Test", MatchCase:=True, lookAt:=xlWhole)
+
+    If FindCell Is Nothing Then
+    MsgBox "No film was found"
+    Else
+        FindCell.Select
+    End If
+    
+End Sub
