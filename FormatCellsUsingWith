@@ -1,0 +1,10 @@
+Option Explicit
+
+Sub FormatCellsUsingWith()
+  With Range("B2:B4")
+    .Interior.Color = rgbAliceBlue
+    .Font.Color = rgbRed
+    .Font.Size = 14
+    End With
+    
+End Sub
