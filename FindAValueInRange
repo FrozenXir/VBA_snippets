@@ -1,0 +1,16 @@
+Option Explicit
+
+Sub FindingARange()
+    Dim FindToFind As String
+    Dim FindCell As Range
+    
+    FindToFind = InputBox("Type what you need to find")
+    
+    Set FindCell = _
+        Range("B2", Range("B2").End(xlDown)).Find(FindToFind)
+    If FindCell Is Nothing Then
+        MsgBox ("That value is not found")
+    Else
+        MsgBox FindCell.Value & " was found in " & FindCell.Address
+    End If
+End Sub
