@@ -3,7 +3,9 @@ Option Explicit
 Sub ShowHowCaseIsWorking()
     Dim ValueFromCell As Integer
     ValueFromCell = 100
-
+    
+    
+'Simple statement
     Select Case ValueFromCell
         Case Is < 100
             MsgBox ("The value is less then 100")
@@ -12,6 +14,19 @@ Sub ShowHowCaseIsWorking()
         Case Else
             MsgBox ("The value is more then 120")
     End Select
+    
+    
+    
+'Secound test possible
+    Select Case ValueFromCell
+        Case 0 To 100
+            MsgBox ("The value is less then 100")
+        Case 100 To 120
+            MsgBox ("The value is less then 120")
+        Case Else
+            MsgBox ("The value is more then 120")
+    End Select
+
         
     
 End Sub
