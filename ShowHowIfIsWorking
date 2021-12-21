@@ -1,0 +1,17 @@
+Option Explicit
+
+Sub ShowHowIfIsWorking()
+    Dim ValueFromCell As Integer
+    ValueFromCell = 100
+
+    
+    If ValueFromCell < 100 Then
+        MsgBox ("The value is less then 100")
+    ElseIf ValueFromCell < 120 Then
+        MsgBox ("The value is less then 120")
+    Else
+        MsgBox ("The value is more the 120")
+    End If
+    
+    
+End Sub
