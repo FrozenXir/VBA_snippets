@@ -3,7 +3,7 @@ import ctypes
 import os
 
 # output folder here:
-folder_path = r"C:\Users\aapostu\Desktop\for Share\Tools for Schaffler\Contracts PDF and JPG split\docs\Output"
+folder_path = r"C:\Users\aapostu\Desktop\for Share\Tools\Contracts PDF and JPG split\docs\Output"
 batches = 0
 
 for subdir, dirs, files in os.walk(folder_path):
