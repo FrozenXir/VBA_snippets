@@ -1,0 +1,31 @@
+Option Explicit
+
+Public Sub MoveCategory()
+    Dim coll As New Collection
+
+'get the range
+    Dim rg As Range
+    Set rg = RawSH.Range("A1").CurrentRegion
+    
+    Dim i As Long
+    For i = 2 To rg.Rows.Count
+        
+        If rg.Cells(i, 3).Value > 3 Then
+            coll.Add rg.Cells(i, 1).Value
+        End If
+    Next i
+    
+    Call WriteDate(coll)
+       
+End Sub
+
+Sub WriteDate(coll As Collection)
+    Dim item As Variant, Row As Long
+    
+    Row = 2
+    For Each item In coll
+        ReadySh.Cells(Row, 8).Value = item
+        Row = Row + 1
+    Next
+    
+End Sub
